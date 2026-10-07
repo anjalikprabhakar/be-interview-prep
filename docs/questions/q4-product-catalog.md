@@ -65,6 +65,13 @@ Response:
 | Staleness | `@CachePut` on update, `@CacheEvict` on delete | TTL only (stale for up to the TTL, which breaks the requirement) | Writes go through the service, so the cache changes on the same code path. |
 | Cache value | DTO | Entity | Detached entities and lazy fields in a cache are a bug source, and the cached value must be immutable. |
 | Count query | `Page` (runs `count(*)`) | `Slice` (no count) | The spec requires totals. Mention the cost at scale. |
+| Page size > 100 | **Clamp** to 100 (`spring.data.web.pageable.max-page-size`) | Reject with 400 | Lenient for clients, and the response's `size` field shows the size actually applied. |
+| Stable paging | `id` is always appended as the last sort key | Sort only by the requested fields | With ties (many products at one price) row order is undefined, so a product could show up on two pages or none. |
+| Who can write | GET for any logged-in user; PUT/DELETE **ADMIN only** (`SecurityConfig`) | Any logged-in user | A catalog any USER could change or delete makes no sense, and it's one matcher line. |
+| Invalid filters | 400 field error for `minPrice > maxPrice` or a negative price (`BadRequestException`) | Return an empty page | The client made a mistake; an empty page would hide it. |
+| Name search | Case-insensitive contains; `%` and `_` in the search text are escaped | Raw `like` | `q=%` would otherwise match every product. |
+| Seed data | `ApplicationRunner`, only when the table is empty; values derived from the index (category `i % 5`, price `i + 0.99`, every 7th out of stock) | Random values · SQL seed migration | Predictable and explainable; tests use their own fixtures and don't depend on it. |
+| Cache vs transaction | Known caveat: `@CachePut`/`@CacheEvict` aren't tied to the commit | `TransactionAwareCacheManagerProxy` | If the transaction rolled back after the cache write, the cache would hold a value the DB doesn't. Low risk here (the write is the last step); worth naming in the interview. |
 
 **Caveats to know:** (1) Multiple instances each have their own Caffeine cache, so an update on instance A leaves B stale, which is why the bonus uses Redis or pub/sub eviction. (2) `@Cacheable` on a method called from **inside the same class** is bypassed, because Spring's proxy only intercepts calls coming from outside the bean. (3) Updates that bypass the service (direct SQL, Q5's stock decrement) don't evict. Either cache without `stock`, or evict from the order service. This connects to Q5.
 
@@ -72,8 +79,8 @@ Response:
 | AC | Test | Type |
 |---|---|---|
 | Filters combine | `ProductListTest.list_categoryPriceRangeInStockAndName_returnsOnlyMatching` | `@SpringBootTest` + MockMvc |
-| Paging metadata | `list_page0Size20_returnsTotals` (100 total, 5 pages) | MockMvc |
-| Size cap | `list_size500_returnsAtMost100` | MockMvc |
+| Paging metadata | `list_page0Size2_returnsTotalsAndPageCount` (5 total, 3 pages) | MockMvc |
+| Size cap | `list_size500_isClampedTo100` | MockMvc |
 | **Cache hit** | `ProductCacheTest.getById_calledTwice_hitsRepositoryOnce` | `@SpringBootTest` + `@MockitoSpyBean` |
 | **Not stale** | `getById_afterUpdate_returnsNewValue`, `getById_afterDelete_returns404` | `@SpringBootTest` |
 
