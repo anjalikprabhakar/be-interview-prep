@@ -1,0 +1,38 @@
+# Build output
+target/
+*.class
+*.log
+HELP.md
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local env and secrets
+.env
+.env.*
+*.local.yml
+*.local.properties
+
+# Local H2 file databases (if file mode is ever used)
+*.mv.db
+*.trace.db
+
+# Claude Code: personal settings stay local; shared skills/settings are committed
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Assignment brief (private; not for the public repo)
+docs/*.pdf
