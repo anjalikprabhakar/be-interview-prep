@@ -3,7 +3,10 @@ package org.example.shortener;
 import jakarta.validation.Valid;
 import org.example.shortener.dto.ShortLinkResponse;
 import org.example.shortener.dto.ShortenRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,5 +30,15 @@ public class ShortLinkController {
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{code}/stats").buildAndExpand(created.code()).toUri();
         return ResponseEntity.created(location).body(created);
+    }
+
+    /**
+     * 302, not 301: browsers cache a 301 and stop calling us, so later visits would not be counted.
+     * The regex keeps this root mapping from catching /api/** or other root paths.
+     */
+    @GetMapping("/{code:[A-Za-z0-9]{1,8}}")
+    public ResponseEntity<Void> redirect(@PathVariable String code) {
+        String originalUrl = service.resolve(code);
+        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(originalUrl)).build();
     }
 }
