@@ -125,6 +125,20 @@ class TaskControllerTest {
     }
 
     @Test
+    void update_blankTitleMissingStatusAndPastDueDate_returns400WithFieldErrors() throws Exception {
+        mvc.perform(put("/api/tasks/1").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"title": " ", "dueDate": "%s"}
+                        """.formatted(LocalDate.now().minusDays(1))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.path").value("/api/tasks/1"))
+                .andExpect(jsonPath("$.fieldErrors", hasSize(3)))
+                .andExpect(jsonPath("$.fieldErrors[*].field", containsInAnyOrder("title", "status", "dueDate")));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
     void delete_unknownId_returns404() throws Exception {
         willThrow(new NotFoundException("Task 99 not found")).given(service).delete(99L);
 
