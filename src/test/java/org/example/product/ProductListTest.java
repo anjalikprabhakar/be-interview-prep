@@ -65,7 +65,8 @@ class ProductListTest {
             "minPrice=25&maxPrice=30            | 2",
             "category=home&q=lamp               | 3",
             "category=home&inStock=true&q=lamp  | 2",
-            "q=%25                              | 0"})
+            "q=%25                              | 0",
+            "q=_                                | 0"})
     void list_anyFilterCombination_returnsMatchingCount(String query, int expected) throws Exception {
         mvc.perform(get("/api/products?" + query.strip()))
                 .andExpect(status().isOk())
@@ -105,6 +106,17 @@ class ProductListTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[*].name")
                         .value(contains("Desk Lamp", "Floor lamp", "Reading Lamp", "Lamp Oil", "Rug")));
+    }
+
+    @Test
+    void list_sortByPriceWithTies_breaksTiesById() throws Exception {
+        // "Lamp Oil" and "Rug" both cost 20.00; id is appended as the last sort key, so insertion order wins.
+        mvc.perform(get("/api/products").param("sort", "price").param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].name").value(contains("Lamp Oil", "Rug")));
+        mvc.perform(get("/api/products").param("sort", "price,desc").param("size", "5"))
+                .andExpect(jsonPath("$.content[3].name").value("Lamp Oil"))
+                .andExpect(jsonPath("$.content[4].name").value("Rug"));
     }
 
     @Test

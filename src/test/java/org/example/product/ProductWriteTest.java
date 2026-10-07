@@ -11,10 +11,12 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/** Who may read and write the catalog, and the error paths of PUT and DELETE. */
 @SpringBootTest
 @AutoConfigureMockMvc
 class ProductWriteTest {
@@ -22,6 +24,7 @@ class ProductWriteTest {
     private static final String VALID_BODY = """
             {"name": "Lamp", "category": "home", "price": 10.00, "stock": 1, "rating": 3.0}
             """;
+    private static final long UNKNOWN_ID = Long.MAX_VALUE;
 
     @Autowired
     MockMvc mvc;
@@ -33,7 +36,23 @@ class ProductWriteTest {
 
     @BeforeEach
     void setUp() {
+        repository.deleteAll();
         id = repository.save(ProductListTest.product("Reading Lamp", "home", "25.00", 5)).getId();
+    }
+
+    @Test
+    void get_noToken_returns401Json() throws Exception {
+        mvc.perform(get("/api/products/{id}", id))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.path").value("/api/products/" + id));
+    }
+
+    @Test
+    void update_noToken_returns401Json() throws Exception {
+        mvc.perform(put("/api/products/{id}", id).contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
     }
 
     @Test
@@ -41,7 +60,8 @@ class ProductWriteTest {
     void update_asUser_returns403AndChangesNothing() throws Exception {
         mvc.perform(put("/api/products/{id}", id).contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.status").value(403));
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.path").value("/api/products/" + id));
 
         assertThat(repository.findById(id)).get().extracting(Product::getName).isEqualTo("Reading Lamp");
     }
@@ -50,7 +70,9 @@ class ProductWriteTest {
     @WithMockUser
     void delete_asUser_returns403AndKeepsProduct() throws Exception {
         mvc.perform(delete("/api/products/{id}", id))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.path").value("/api/products/" + id));
 
         assertThat(repository.existsById(id)).isTrue();
     }
@@ -72,7 +94,18 @@ class ProductWriteTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void update_unknownId_returns404() throws Exception {
-        mvc.perform(put("/api/products/{id}", 999_999).contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
-                .andExpect(status().isNotFound());
+        mvc.perform(put("/api/products/{id}", UNKNOWN_ID).contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("Product " + UNKNOWN_ID + " not found"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void delete_unknownId_returns404() throws Exception {
+        mvc.perform(delete("/api/products/{id}", UNKNOWN_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("Product " + UNKNOWN_ID + " not found"));
     }
 }
