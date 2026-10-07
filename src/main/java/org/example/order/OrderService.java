@@ -9,6 +9,7 @@ import org.example.product.ProductRepository;
 import org.example.product.ProductService;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -16,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Function;
@@ -39,13 +41,23 @@ public class OrderService {
 
     /**
      * The transaction is opened explicitly (TransactionTemplate) instead of with @Transactional, so this
-     * method can act after the commit: the Q4 product cache is evicted only once the new stock is visible.
+     * method can act after it ends: catch the duplicate-key failure of a concurrent retry (the transaction
+     * has rolled back by then, stock included), and evict the Q4 product cache once the new stock is visible.
      */
-    public OrderResponse place(String customer, String idempotencyKey, OrderRequest request) {
+    public PlaceOrderResult place(String customer, String idempotencyKey, OrderRequest request) {
         SortedMap<Long, Integer> quantities = mergeByProduct(request);
-        OrderResponse order = transaction.execute(status -> placeInTransaction(customer, idempotencyKey, quantities));
-        evictProducts(quantities.keySet());
-        return order;
+        PlaceOrderResult result;
+        try {
+            result = transaction.execute(status -> placeInTransaction(customer, idempotencyKey, quantities));
+        } catch (DataIntegrityViolationException ex) {
+            // Two requests with the same key passed the "already placed?" check at the same moment; the
+            // UNIQUE (customer, idempotency_key) constraint let only the other one commit. Return its order.
+            return transaction.execute(status -> findRetried(customer, idempotencyKey).orElseThrow(() -> ex));
+        }
+        if (result.created()) {
+            evictProducts(quantities.keySet());
+        }
+        return result;
     }
 
     @Transactional(readOnly = true)
@@ -53,8 +65,14 @@ public class OrderService {
         return OrderResponse.from(findOrder(id, customer));
     }
 
-    private OrderResponse placeInTransaction(String customer, String idempotencyKey,
-                                             SortedMap<Long, Integer> quantities) {
+    private PlaceOrderResult placeInTransaction(String customer, String idempotencyKey,
+                                                SortedMap<Long, Integer> quantities) {
+        // A retry of an order that was already placed: return it as is, without touching stock.
+        Optional<PlaceOrderResult> retried = findRetried(customer, idempotencyKey);
+        if (retried.isPresent()) {
+            return retried.get();
+        }
+
         Map<Long, Product> catalog = products.findAllById(quantities.keySet()).stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
         for (Long productId : quantities.keySet()) {
@@ -74,7 +92,12 @@ public class OrderService {
             BigDecimal price = catalog.get(productId).getPrice();
             order.addItem(new OrderItem(productId, quantity, price));
         });
-        return OrderResponse.from(orders.save(order));
+        return new PlaceOrderResult(OrderResponse.from(orders.save(order)), true);
+    }
+
+    private Optional<PlaceOrderResult> findRetried(String customer, String idempotencyKey) {
+        return orders.findByCustomerAndIdempotencyKey(customer, idempotencyKey)
+                .map(existing -> new PlaceOrderResult(OrderResponse.from(existing), false));
     }
 
     private Order findOrder(Long id, String customer) {

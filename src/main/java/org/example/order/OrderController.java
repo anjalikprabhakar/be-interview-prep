@@ -30,13 +30,21 @@ public class OrderController {
     }
 
     /** The customer is the token's subject (authentication.getName()), never a value from the body. */
+    /**
+     * The client generates one Idempotency-Key per logical order and sends the same key when it retries,
+     * so a retry after a network failure returns the existing order instead of placing a second one.
+     */
     @PostMapping
     public ResponseEntity<OrderResponse> place(@RequestHeader(IDEMPOTENCY_KEY) String idempotencyKey,
                                                @Valid @RequestBody OrderRequest request,
                                                Authentication authentication) {
         requireValidKey(idempotencyKey);
-        OrderResponse order = service.place(authentication.getName(), idempotencyKey, request);
-        return ResponseEntity.created(URI.create("/api/orders/" + order.id())).body(order);
+        PlaceOrderResult result = service.place(authentication.getName(), idempotencyKey, request);
+        // A retry gets 200 with the original order: to the client it looks like the first call succeeded.
+        if (!result.created()) {
+            return ResponseEntity.ok(result.order());
+        }
+        return ResponseEntity.created(URI.create("/api/orders/" + result.order().id())).body(result.order());
     }
 
     @GetMapping("/{id}")

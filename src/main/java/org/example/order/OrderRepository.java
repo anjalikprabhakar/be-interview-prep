@@ -8,4 +8,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     /** Scoped to the customer: another user's order is reported as not found. */
     Optional<Order> findByIdAndCustomer(Long id, String customer);
+
+    Optional<Order> findByCustomerAndIdempotencyKey(String customer, String idempotencyKey);
 }
