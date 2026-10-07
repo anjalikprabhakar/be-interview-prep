@@ -42,6 +42,9 @@ public class SecurityConfig {
                         // Q2 short links must keep working for anyone who clicks them.
                         .requestMatchers(HttpMethod.GET, "/{code:[A-Za-z0-9]{1,8}}").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // Any logged-in user can browse the catalog; only an ADMIN can change it.
+                        .requestMatchers(HttpMethod.PUT, "/api/products/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))

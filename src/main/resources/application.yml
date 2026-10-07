@@ -11,6 +11,16 @@ spring:
       ddl-auto: validate   # schema is owned by Flyway migrations
   flyway:
     locations: classpath:db/migration
+  cache:
+    type: caffeine
+    cache-names: products
+    caffeine:
+      # Bounded memory. The TTL is only a safety net: freshness comes from @CachePut/@CacheEvict on writes.
+      spec: maximumSize=10000,expireAfterWrite=10m
+  data:
+    web:
+      pageable:
+        max-page-size: 100   # ?size=500 is clamped to 100 (the response's "size" shows the applied value)
 
 app:
   base-url: http://localhost:8080   # prefix for shortUrl in POST /api/urls responses

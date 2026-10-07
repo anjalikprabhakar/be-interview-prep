@@ -24,11 +24,17 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /** @Valid failed on a request body: one entry per invalid field. */
+    /**
+     * @Valid failed on a request body or on query parameters bound to a record: one entry per invalid field.
+     * A binding failure (e.g. ?minPrice=abc) carries Spring's raw conversion error, with Java type names in it,
+     * so it is replaced by the same short message the other type-mismatch handler uses.
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
         List<ApiError.FieldError> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> new ApiError.FieldError(fe.getField(), fe.getDefaultMessage()))
+                .map(fe -> new ApiError.FieldError(fe.getField(), fe.isBindingFailure()
+                        ? invalidValueMessage(fe.getRejectedValue(), null)
+                        : fe.getDefaultMessage()))
                 .toList();
         return build(HttpStatus.BAD_REQUEST, "Validation failed", request, fieldErrors);
     }
@@ -49,6 +55,12 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, "Validation failed", request,
                 List.of(new ApiError.FieldError(ex.getName(), invalidValueMessage(ex.getValue(), ex.getRequiredType()))));
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    ResponseEntity<ApiError> handleBadRequest(BadRequestException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "Validation failed", request,
+                List.of(new ApiError.FieldError(ex.getField(), ex.getMessage())));
     }
 
     @ExceptionHandler(NotFoundException.class)
