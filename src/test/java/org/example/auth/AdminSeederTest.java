@@ -43,6 +43,17 @@ class AdminSeederTest {
     }
 
     @Test
+    void run_emailRegisteredAsUser_doesNotPromoteIt() {
+        User existing = new User("admin@example.com", "$2a$existing", Role.USER);
+        given(repository.findByEmail("admin@example.com")).willReturn(Optional.of(existing));
+
+        new AdminSeeder(repository, passwordEncoder, "admin@example.com", "admin-password").run(null);
+
+        verify(repository, never()).save(any());
+        assertThat(existing.getRole()).isEqualTo(Role.USER);
+    }
+
+    @Test
     void run_adminAlreadyExists_createsNothing() {
         given(repository.findByEmail("admin@example.com"))
                 .willReturn(Optional.of(new User("admin@example.com", "$2a$existing", Role.ADMIN)));

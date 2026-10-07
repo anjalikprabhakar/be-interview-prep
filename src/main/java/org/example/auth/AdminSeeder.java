@@ -11,6 +11,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
 /**
  * The only way an ADMIN is created: registration always makes a USER.
  * Runs on startup when ADMIN_EMAIL and ADMIN_PASSWORD are set, and does nothing otherwise.
@@ -40,7 +42,13 @@ public class AdminSeeder implements ApplicationRunner {
             return;
         }
         String normalized = User.normalizeEmail(email);
-        if (repository.findByEmail(normalized).isPresent()) {
+        Optional<User> existing = repository.findByEmail(normalized);
+        if (existing.isPresent()) {
+            // Never promote an existing account: whoever registered this email first would become ADMIN.
+            if (existing.get().getRole() != Role.ADMIN) {
+                log.warn("ADMIN_EMAIL {} is already registered as {}; no admin was created",
+                        normalized, existing.get().getRole());
+            }
             return;
         }
         repository.save(new User(normalized, passwordEncoder.encode(password), Role.ADMIN));
