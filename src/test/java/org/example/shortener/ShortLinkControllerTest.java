@@ -1,5 +1,7 @@
 package org.example.shortener;
 
+import org.example.auth.SecurityConfig;
+import org.example.auth.SecurityErrorHandler;
 import org.example.shortener.dto.ShortLinkResponse;
 import org.example.shortener.dto.ShortenRequest;
 import org.junit.jupiter.api.Test;
@@ -7,7 +9,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -25,6 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ShortLinkController.class)
+@Import({SecurityConfig.class, SecurityErrorHandler.class})
+@WithMockUser
 class ShortLinkControllerTest {
 
     @Autowired
