@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -93,6 +94,17 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT,
                 "The resource was modified or deleted by another request; reload it and retry",
                 request, List.of());
+    }
+
+    /**
+     * A database constraint rejected the write, e.g. deleting a product that orders still reference
+     * (order_items FK). The client gets a 409; the constraint name stays in the log, not in the response.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
+        log.warn("Constraint violation on {} {}: {}", request.getMethod(), request.getRequestURI(),
+                ex.getMostSpecificCause().getMessage());
+        return build(HttpStatus.CONFLICT, "The request conflicts with existing data", request, List.of());
     }
 
     /** Anything else: log the details, but never expose them to the client. */

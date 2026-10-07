@@ -68,6 +68,11 @@ public OrderResponse place(String customer, String key, OrderRequest req) {
 | Retry response | 200 with the original order | 409 "duplicate" | The client just wants the result, so a retry should look like success. |
 | Same key + different body | Return 422 (if you store a body hash) | Ignore | Optional. Mention it as a "with more time" item. |
 | Deadlocks | Sort items by productId | — | Two orders locking rows A→B and B→A can deadlock. A consistent order prevents it. |
+| **Transaction boundary** (as built) | `TransactionTemplate` inside `OrderService` | `@Transactional` method + a separate wrapper bean that catches the duplicate key · catching in the controller | The duplicate-key catch and the cache eviction must run *after* the transaction ends. With `@Transactional` that needs a second bean (a self-call bypasses the proxy). The template keeps it in one class. |
+| Q4 cache (as built) | Evict the ordered products' cache entries after commit (place and cancel) | Don't cache stock · evict inside the transaction | Evicting before commit lets a concurrent GET re-cache the old stock. Small leftover window: a GET that read before the commit and writes the cache after the eviction (bounded by the 10 min TTL). |
+| Other users' orders (as built) | 404 | 403 | Doesn't reveal that an order id exists. |
+| Same key, different body (as built) | Original order returned | 422 via a stored body hash | Kept simple; "with more time" item. |
+| Deleting an ordered product (as built) | 409 via a `DataIntegrityViolationException` handler | Soft delete · cascade | The new `order_items → products` FK would otherwise turn an ADMIN delete into a 500. Past orders must keep their product. |
 
 ## Test plan
 | AC | Test | Type |
