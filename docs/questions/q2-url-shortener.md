@@ -60,6 +60,11 @@ Restrict the redirect mapping to `/{code:[A-Za-z0-9]{1,8}}` so it can't swallow 
 | Redirect status | **302** | 301 permanent | Browsers cache 301 and skip the server, so visits wouldn't be counted. |
 | Expired | **410 Gone** | 404 | Tells the client that it existed but is no longer valid. |
 | Visit counting | Atomic `UPDATE … +1` | Read-modify-write (lost updates) · `@Version` optimistic lock (retries under a hot link) · pessimistic lock (serializes reads) · a visits table (insert per visit, the best for analytics and write scaling) · Redis `INCR` | Simplest correct option. One statement, no retries. |
+| Collision retry transaction | `shorten()` is **not** `@Transactional`; each `saveAndFlush` commits on its own | One `@Transactional` around the loop | A constraint violation marks the surrounding transaction rollback-only, so every retry inside it would fail too. |
+| URL validation | Custom `@HttpUrl` constraint (parses with `java.net.URI`) | Check in the service · `@URL` from Hibernate Validator (accepts `ftp:` etc.) | Returns a 400 field error in the same shape as the other validation errors, and only allows `http`/`https`. |
+| Expired link visits | 410, and the visit is **not** counted | Count it anyway | The visitor never reached the target. |
+| Stats after expiry | **200** with the stats | 410 like the redirect | The owner can still see the final numbers; expiry only stops redirects. |
+| `Location` on create | `/api/urls/{code}/stats` | The short URL itself | The stats endpoint is the API resource describing the link; the short URL is already in the body. |
 
 ## Test plan
 | AC | Test | Type |
