@@ -2,6 +2,7 @@ package org.example.product;
 
 import org.example.common.exception.BadRequestException;
 import org.example.common.web.PageResponse;
+import org.example.product.dto.ProductFilter;
 import org.example.product.dto.ProductResponse;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -22,9 +23,16 @@ public class ProductService {
         this.repository = repository;
     }
 
+    /** All filters and the page are applied in one query (plus the count(*) that gives the totals). */
     @Transactional(readOnly = true)
-    public PageResponse<ProductResponse> list(Pageable pageable) {
-        return PageResponse.from(repository.findAll(withStableSort(pageable)), ProductResponse::from);
+    public PageResponse<ProductResponse> list(ProductFilter filter, Pageable pageable) {
+        if (filter.minPrice() != null && filter.maxPrice() != null
+                && filter.minPrice().compareTo(filter.maxPrice()) > 0) {
+            throw new BadRequestException("minPrice", "minPrice must not be greater than maxPrice");
+        }
+        return PageResponse.from(
+                repository.findAll(ProductSpecifications.matching(filter), withStableSort(pageable)),
+                ProductResponse::from);
     }
 
     /**
