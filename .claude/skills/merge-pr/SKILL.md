@@ -13,6 +13,7 @@ disable-model-invocation: true
    - `gh pr checks` passes (if CI exists).
    - The PR body has all four template sections filled in.
    - The README row for this question contains the PR link.
+   - The latest `# Verdict:` review on the PR is **PASS** and covers the current head commit. Otherwise suggest `/pr-review` first.
 3. Merge. Use a merge commit by default, because it keeps the small meaningful commits visible on main. Use `--squash` only if the user asked for it.
    ```
    gh pr merge <n> --merge --delete-branch

@@ -10,7 +10,7 @@ argument-hint: [q1..q5 | TICKET-ID]
    - `git diff main...HEAD`, `git diff`, `git status --porcelain`
    - `git log main..HEAD --oneline`
 2. In parallel:
-   - Delegate the deep review to the `code-reviewer` subagent, giving it the diff scope and the spec path (`docs/questions/<q>*.md`).
+   - Delegate the deep review to the Reviewer Agents chosen by the Label Routing table in `CLAUDE.md` → `## Project-specific` (by default `code-reviewer` and `test-reviewer`). Give them the diff scope, the spec path (`docs/questions/<q>*.md`), and the Conventions Skills to apply.
    - Run `./mvnw -q verify`.
 3. Check these yourself:
    - **AC coverage:** for each acceptance criterion in the spec, name the code and the test that satisfy it.
