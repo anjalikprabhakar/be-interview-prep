@@ -20,11 +20,20 @@ Java 21 · Spring Boot 3.5 · Spring Web, Validation, Data JPA · Flyway · H2 (
 - No Maven install needed. The Maven wrapper (`mvnw`) is included.
 
 ## Run the app
+The JWT signing key comes from the environment. The app refuses to start without it.
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `JWT_SECRET` | yes | HS256 signing key, at least 32 bytes |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | no | When both are set, an ADMIN account is created on startup |
+
 ```bash
+export JWT_SECRET="$(openssl rand -base64 48)"
 ./mvnw spring-boot:run          # macOS / Linux / Git Bash
-mvnw.cmd spring-boot:run        # Windows cmd / PowerShell
+mvnw.cmd spring-boot:run        # Windows cmd / PowerShell (set JWT_SECRET first)
 ```
 The app starts on http://localhost:8080 with an in-memory H2 database. Flyway creates the schema on startup.
+Tests need no environment variables: they generate a random key for each run.
 
 ## Run the tests
 ```bash
