@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -144,6 +145,18 @@ class TaskControllerTest {
 
         mvc.perform(delete("/api/tasks/99"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void delete_taskDeletedConcurrently_returns409() throws Exception {
+        // What Spring throws when the row vanished between our read and our DELETE/UPDATE.
+        willThrow(new ObjectOptimisticLockingFailureException(Task.class, 5L)).given(service).delete(5L);
+
+        mvc.perform(delete("/api/tasks/5"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.path").value("/api/tasks/5"));
     }
 
     @Test

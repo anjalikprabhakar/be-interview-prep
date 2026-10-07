@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -53,6 +54,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NotFoundException.class)
     ResponseEntity<ApiError> handleNotFound(NotFoundException ex, HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
+    }
+
+    /**
+     * The row changed or disappeared between our read and our write, e.g. two DELETEs (or a DELETE and a PUT)
+     * on the same task at the same time. The losing request gets a retryable 409 instead of a 500.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ResponseEntity<ApiError> handleConcurrentModification(OptimisticLockingFailureException ex,
+                                                          HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT,
+                "The resource was modified or deleted by another request; reload it and retry",
+                request, List.of());
     }
 
     /** Anything else: log the details, but never expose them to the client. */

@@ -59,6 +59,7 @@ Error example:
 | `HttpMessageNotReadableException` | 400 | malformed JSON, bad enum value, or bad date in the body |
 | `MethodArgumentTypeMismatchException` | 400 | `?status=FOO`, `/api/tasks/abc` |
 | `NotFoundException` | 404 | unknown id |
+| `OptimisticLockingFailureException` | 409 | the row was deleted by a concurrent request between our read and our write |
 | `Exception` (catch-all) | 500, generic message | never leak stack traces, and log the real error |
 
 ### Decisions & alternatives
@@ -70,6 +71,7 @@ Error example:
 | Status on create | Required, no default | Default to `TO_DO` | POST and full-replace PUT share one DTO and one set of rules, with no hidden defaults. |
 | Description length | No limit | Arbitrary max (for example 2000) | The assignment sets no limit, so we don't invent a business rule. |
 | Unknown paths, 405, 415 | Catch-all keeps the status of Spring's `ErrorResponse` exceptions | Extend `ResponseEntityExceptionHandler` | One small `instanceof` check keeps every Spring MVC error in the same `ApiError` format, with no extra base class. |
+| Concurrent delete or update | 409 Conflict, retryable | 404 · let it be 500 | Hibernate checks the affected row count. If a parallel DELETE removed the row after our read, the write affects 0 rows and Spring throws `ObjectOptimisticLockingFailureException`. 409 tells the client to reload and retry. (Reproduced on H2 for both DELETE and PUT.) |
 | Status filter | Optional `@RequestParam TaskStatus status` | Specification | Only one filter, so a derived query is enough. |
 | Created date | `@PrePersist` / `@CreationTimestamp` | Client-supplied | The server owns this value. Clients can't fake it. |
 | Pagination | Not added (not required) | `Pageable` | Out of scope for 15 minutes. Mention it as a "with more time" item. |
@@ -95,5 +97,6 @@ Error example:
 - **What if you remove `@Valid`?** Constraints aren't checked. A blank title reaches the DB, where `NOT NULL` passes for `""` but a >100-character title throws `DataIntegrityViolationException`, which becomes a 500.
 - **What if you remove the catch-all handler?** Spring Boot's default `/error` JSON is returned, in a different shape. The "one consistent format" requirement is broken.
 - **Two concurrent PUTs on the same task?** Last write wins (lost update). The fix is `@Version` optimistic locking → 409 on a stale write.
+- **DELETE racing a DELETE or PUT on the same task?** Both requests pass `findById`, the first commits, and the second write affects 0 rows. Hibernate throws, and `GlobalExceptionHandler` maps it to **409**, not 500.
 - **Why return a DTO instead of the entity?** It avoids exposing internal fields, lazy-loading serialization issues, and mass assignment (a client setting `createdAt`/`id`).
 - **Live change ideas:** add a `priority` field; make `title` max 50; add a `dueBefore` filter.
