@@ -14,3 +14,13 @@ spring:
 
 app:
   base-url: http://localhost:8080   # prefix for shortUrl in POST /api/urls responses
+
+  jwt:
+    # HS256 signing key (at least 32 bytes). Supplied by the environment only: no default, so the app
+    # refuses to start without it instead of silently using a key from source control.
+    secret: ${JWT_SECRET}
+  admin:
+    # Optional: when both are set, an ADMIN account is created on startup (see AdminSeeder).
+    # Empty defaults mean "no admin", not a fallback credential.
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}

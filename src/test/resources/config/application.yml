@@ -1,0 +1,7 @@
+# Test-only overrides. Spring Boot loads classpath:/config/application.yml on top of the main
+# classpath:/application.yml (a test file at the root would hide the main one instead of overriding it).
+app:
+  jwt:
+    # A fresh random key for every test context: no signing key is ever committed.
+    # 2 x 32 random hex chars = 64 bytes, above the 32-byte HS256 minimum.
+    secret: ${random.value}${random.value}

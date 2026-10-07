@@ -1,13 +1,17 @@
 package org.example.task;
 
+import org.example.auth.SecurityConfig;
+import org.example.auth.SecurityErrorHandler;
 import org.example.common.exception.NotFoundException;
 import org.example.task.dto.TaskRequest;
 import org.example.task.dto.TaskResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -32,6 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(TaskController.class)
+@Import({SecurityConfig.class, SecurityErrorHandler.class})
+@WithMockUser
 class TaskControllerTest {
 
     @Autowired
