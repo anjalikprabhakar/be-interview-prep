@@ -16,6 +16,9 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -106,5 +109,22 @@ class AccessControlTest {
         mvc.perform(get("/pub1234"))
                 .andExpect(status().isFound())
                 .andExpect(header().string(HttpHeaders.LOCATION, "https://example.com"));
+    }
+
+    @Test
+    void shortLinkRedirect_noTokenUnknownCode_returns404NotA401() throws Exception {
+        mvc.perform(get("/nope123"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    void shortLinkRedirect_noTokenExpiredCode_returns410NotA401() throws Exception {
+        shortLinkRepository.saveAndFlush(new ShortLink("old1234", "https://example.com",
+                Instant.now().minus(1, ChronoUnit.HOURS)));
+
+        mvc.perform(get("/old1234"))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.status").value(410));
     }
 }
