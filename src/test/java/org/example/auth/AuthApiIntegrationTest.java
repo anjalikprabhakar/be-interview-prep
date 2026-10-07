@@ -155,6 +155,8 @@ class AuthApiIntegrationTest {
 
     @Test
     void me_withToken_returnsOwnProfile() throws Exception {
+        // Two users, logged in as the second: a /me that ignored the token and returned any user would fail.
+        AuthTestSupport.register(mvc, "other@example.com");
         AuthTestSupport.register(mvc, "erin@example.com");
         String token = AuthTestSupport.login(mvc, objectMapper, "erin@example.com");
 
