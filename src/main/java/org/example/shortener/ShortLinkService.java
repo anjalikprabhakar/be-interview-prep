@@ -1,7 +1,9 @@
 package org.example.shortener;
 
+import org.example.common.exception.GoneException;
 import org.example.common.exception.NotFoundException;
 import org.example.shortener.dto.ShortLinkResponse;
+import org.example.shortener.dto.ShortLinkStatsResponse;
 import org.example.shortener.dto.ShortenRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
 
 @Service
 public class ShortLinkService {
@@ -45,12 +49,24 @@ public class ShortLinkService {
         throw new IllegalStateException("Could not generate a unique short code after " + MAX_ATTEMPTS + " attempts");
     }
 
-    /** Returns the original URL and counts the visit with one atomic UPDATE (safe under concurrent visits). */
+    /**
+     * Returns the original URL and counts the visit with one atomic UPDATE (safe under concurrent visits).
+     * Expired links are rejected with 410 and the visit is not counted.
+     */
     @Transactional
     public String resolve(String code) {
         ShortLink link = findLink(code);
+        if (link.isExpired(Instant.now())) {
+            throw new GoneException("Short link " + code + " has expired");
+        }
         repository.incrementVisits(link.getId());
         return link.getOriginalUrl();
+    }
+
+    /** Stats stay readable after expiry so the owner can still see the final numbers. */
+    @Transactional(readOnly = true)
+    public ShortLinkStatsResponse stats(String code) {
+        return ShortLinkStatsResponse.from(findLink(code));
     }
 
     private ShortLink findLink(String code) {

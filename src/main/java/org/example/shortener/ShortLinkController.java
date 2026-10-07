@@ -2,6 +2,7 @@ package org.example.shortener;
 
 import jakarta.validation.Valid;
 import org.example.shortener.dto.ShortLinkResponse;
+import org.example.shortener.dto.ShortLinkStatsResponse;
 import org.example.shortener.dto.ShortenRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,11 @@ public class ShortLinkController {
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{code}/stats").buildAndExpand(created.code()).toUri();
         return ResponseEntity.created(location).body(created);
+    }
+
+    @GetMapping("/api/urls/{code}/stats")
+    public ShortLinkStatsResponse stats(@PathVariable String code) {
+        return service.stats(code);
     }
 
     /**
