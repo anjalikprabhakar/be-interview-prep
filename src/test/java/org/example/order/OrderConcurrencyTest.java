@@ -101,6 +101,27 @@ class OrderConcurrencyTest {
         assertThat(products.findById(productId).orElseThrow().getStock()).isEqualTo(9);
     }
 
+    @Test
+    void place_sameIdempotencyKeyConcurrentlyLastUnit_everyRetryGetsTheOrder() throws Exception {
+        Long lastUnitId = products.save(new Product("Last Lamp", "home", new BigDecimal("25.00"), 1,
+                new BigDecimal("4.0"))).getId();
+        List<Callable<PlaceOrderResult>> calls = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            calls.add(() -> service.place("alice@example.com", "same-key", oneOf(lastUnitId)));
+        }
+
+        // A retry that waited on the row lock finds stock 0; it must still get the order, not a 409.
+        List<PlaceOrderResult> results = new ArrayList<>();
+        for (Future<PlaceOrderResult> future : runTogether(calls)) {
+            results.add(future.get(30, TimeUnit.SECONDS));
+        }
+
+        assertThat(results).filteredOn(PlaceOrderResult::created).hasSize(1);
+        assertThat(results).extracting(result -> result.order().id()).containsOnly(results.get(0).order().id());
+        assertThat(orders.count()).isEqualTo(1);
+        assertThat(products.findById(lastUnitId).orElseThrow().getStock()).isZero();
+    }
+
     private static OrderRequest oneOf(Long productId) {
         return new OrderRequest(List.of(new OrderItemRequest(productId, 1)));
     }

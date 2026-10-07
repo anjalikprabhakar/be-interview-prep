@@ -44,7 +44,7 @@ public class OrderService {
 
     /**
      * The transaction is opened explicitly (TransactionTemplate) instead of with @Transactional, so this
-     * method can act after it ends: catch the duplicate-key failure of a concurrent retry (the transaction
+     * method can act after it ends: catch the failure of a concurrent retry (the transaction
      * has rolled back by then, stock included), and evict the Q4 product cache once the new stock is visible.
      */
     public PlaceOrderResult place(String customer, String idempotencyKey, OrderRequest request) {
@@ -52,9 +52,11 @@ public class OrderService {
         PlaceOrderResult result;
         try {
             result = transaction.execute(status -> placeInTransaction(customer, idempotencyKey, quantities));
-        } catch (DataIntegrityViolationException ex) {
-            // Two requests with the same key passed the "already placed?" check at the same moment; the
-            // UNIQUE (customer, idempotency_key) constraint let only the other one commit. Return its order.
+        } catch (DataIntegrityViolationException | InsufficientStockException ex) {
+            // Two requests with the same key passed the "already placed?" check at the same moment, and the
+            // other one committed first. This one then failed either on the UNIQUE (customer, idempotency_key)
+            // constraint, or earlier on stock that the other one just took. Either way, return the other
+            // one's order; if there is none, the failure was genuine and is rethrown.
             return transaction.execute(status -> findRetried(customer, idempotencyKey).orElseThrow(() -> ex));
         }
         if (result.created()) {
