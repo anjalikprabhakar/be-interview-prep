@@ -25,8 +25,8 @@
 |---|---|---|
 | id | BIGINT identity | PK |
 | title | VARCHAR(100) NOT NULL | the DB also enforces the limit |
-| description | VARCHAR(2000) NULL | |
-| status | VARCHAR(20) NOT NULL | `TODO`, `IN_PROGRESS`, `DONE` (enum stored as a string) |
+| description | VARCHAR NULL | optional, no length rule (the assignment sets none) |
+| status | VARCHAR(20) NOT NULL | `TO_DO`, `IN_PROGRESS`, `DONE` (enum stored as a string) |
 | due_date | DATE NULL | |
 | created_at | TIMESTAMP NOT NULL | set by the server, never by the client |
 
@@ -34,12 +34,12 @@
 | Method | Path | Success | Errors |
 |---|---|---|---|
 | POST | `/api/tasks` | 201 + `Location` | 400 |
-| GET | `/api/tasks?status=TODO` | 200 (list, `status` optional) | 400 for an unknown status |
+| GET | `/api/tasks?status=TO_DO` | 200 (list, `status` optional) | 400 for an unknown status |
 | GET | `/api/tasks/{id}` | 200 | 404 |
 | PUT | `/api/tasks/{id}` | 200 | 400, 404 |
 | DELETE | `/api/tasks/{id}` | 204 | 404 |
 
-Request: `{ "title": "Write report", "description": "...", "status": "TODO", "dueDate": "2026-12-01" }`. `status` defaults to `TODO` on create.
+Request: `{ "title": "Write report", "description": "...", "status": "TO_DO", "dueDate": "2026-12-01" }`. `status` is **required** (no default), `description` and `dueDate` are optional.
 Response: the same fields plus `id` and `createdAt`.
 
 Error example:
@@ -67,6 +67,9 @@ Error example:
 | Error format | Custom `ApiError` record | Spring's `ProblemDetail` (RFC 9457) | Full control over the `fieldErrors` shape, and the same format can be written by the security handlers in Q3. ProblemDetail is a valid standard alternative. |
 | Due date in past | `@FutureOrPresent` on the DTO | Check in the service | Declarative, and appears in field errors automatically. Trade-off: it's evaluated in server time zone. |
 | Update | PUT (full replace) | PATCH (partial) | Simpler validation, because the whole body is validated the same way as create. |
+| Status on create | Required, no default | Default to `TO_DO` | POST and full-replace PUT share one DTO and one set of rules, with no hidden defaults. |
+| Description length | No limit | Arbitrary max (for example 2000) | The assignment sets no limit, so we don't invent a business rule. |
+| Unknown paths, 405, 415 | Catch-all keeps the status of Spring's `ErrorResponse` exceptions | Extend `ResponseEntityExceptionHandler` | One small `instanceof` check keeps every Spring MVC error in the same `ApiError` format, with no extra base class. |
 | Status filter | Optional `@RequestParam TaskStatus status` | Specification | Only one filter, so a derived query is enough. |
 | Created date | `@PrePersist` / `@CreationTimestamp` | Client-supplied | The server owns this value. Clients can't fake it. |
 | Pagination | Not added (not required) | `Pageable` | Out of scope for 15 minutes. Mention it as a "with more time" item. |
