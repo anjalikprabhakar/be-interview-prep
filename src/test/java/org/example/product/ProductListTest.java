@@ -144,6 +144,14 @@ class ProductListTest {
                 .andExpect(jsonPath("$.fieldErrors[0].message").value("minPrice must be zero or more"));
     }
 
+    @Test
+    void list_nonNumericMinPrice_returns400WithoutInternals() throws Exception {
+        mvc.perform(get("/api/products").param("minPrice", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("minPrice"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("invalid value 'abc'"));
+    }
+
     static Product product(String name, String category, String price, int stock) {
         return new Product(name, category, new BigDecimal(price), stock, new BigDecimal("4.0"));
     }
