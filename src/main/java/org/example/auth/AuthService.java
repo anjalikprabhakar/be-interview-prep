@@ -12,7 +12,6 @@ import org.example.user.dto.UserResponse;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -47,8 +46,11 @@ public class AuthService {
         }
     }
 
-    /** One generic message for unknown email and wrong password, so attackers can't enumerate accounts. */
-    @Transactional(readOnly = true)
+    /**
+     * One generic message for unknown email and wrong password, so attackers can't enumerate accounts.
+     * Not @Transactional: findByEmail is a single read, and a transaction here would hold a DB connection
+     * for the whole (deliberately slow) BCrypt check.
+     */
     public TokenResponse login(LoginRequest request) {
         Optional<User> user = repository.findByEmail(User.normalizeEmail(request.email()));
         String hash = user.map(User::getPasswordHash).orElse(dummyHash);
