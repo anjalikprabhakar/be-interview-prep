@@ -71,7 +71,7 @@ Once security is on the classpath, **every endpoint requires a token**, so the Q
 | Test signing key | `src/test/resources/config/application.yml`: `${random.value}${random.value}` (new key per test context) | A fixed test key in a test yml · `@DynamicPropertySource` on every test class | No key is committed, and no annotation is needed per class. It sits under `config/` because a test `application.yml` at the root would hide the main one instead of overriding it. |
 | Duplicate email | Catch the UNIQUE violation outside a transaction → 409 (`register` is not `@Transactional`) | `existsByEmail` check first | The check-then-insert races. The constraint is the guarantee, the same pattern as Q2's code collisions. |
 | Email case | Trimmed and lower-cased before saving and on login | Store as typed | `A@x.com` and `a@x.com` would otherwise be two accounts. |
-| Password length | 8 to 72 characters | No max | BCrypt silently ignores bytes after 72. |
+| Password length | At least 8 characters, at most 72 **bytes** (custom `@MaxBytes`) | `@Size(max = 72)` · no max | BCrypt's limit is 72 bytes, and Spring Security 6.5 throws on longer input. `@Size` counts characters, so 30 × "€" (90 bytes) would pass it and then crash with a 500. |
 | Q1/Q2 under security | Redirect `/{code}` stays public; every other `/api/**` needs a token; existing tests use `@WithMockUser` | `.with(jwt())` on each request | One class-level annotation per test class. The real token flow is covered by the auth tests. |
 
 ## Test plan

@@ -105,7 +105,20 @@ class AuthApiIntegrationTest {
                 .andExpect(jsonPath("$.fieldErrors[?(@.field == 'email')].message")
                         .value("email must be a valid email address"))
                 .andExpect(jsonPath("$.fieldErrors[?(@.field == 'password')].message")
-                        .value("password must be between 8 and 72 characters"));
+                        .value("password must be at least 8 characters"));
+    }
+
+    @Test
+    void register_passwordOver72Bytes_returns400() throws Exception {
+        // 30 characters but 90 UTF-8 bytes: within a character limit, over BCrypt's 72-byte limit.
+        String password = "€".repeat(30);
+
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "euro@example.com", "password": "%s"}
+                        """.formatted(password)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("password"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("password must be at most 72 bytes"));
     }
 
     @Test
@@ -141,27 +154,29 @@ class AuthApiIntegrationTest {
     }
 
     @Test
-    void me_withToken_returnsOwnProfileWithoutCreatingSession() throws Exception {
+    void me_withToken_returnsOwnProfile() throws Exception {
         AuthTestSupport.register(mvc, "erin@example.com");
         String token = AuthTestSupport.login(mvc, objectMapper, "erin@example.com");
 
-        MvcResult result = mvc.perform(get("/api/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        mvc.perform(get("/api/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("erin@example.com"))
                 .andExpect(jsonPath("$.role").value("USER"))
-                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist());
+    }
+
+    @Test
+    void me_noToken_returns401JsonWithoutCreatingSession() throws Exception {
+        // Without STATELESS, a rejected request is saved in an HttpSession (to replay after login),
+        // so this is the path where a session would appear.
+        MvcResult result = mvc.perform(get("/api/users/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message").value("Authentication required"))
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
                 .andReturn();
 
         assertThat(result.getRequest().getSession(false)).isNull();
-    }
-
-    @Test
-    void me_noToken_returns401Json() throws Exception {
-        mvc.perform(get("/api/users/me"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.message").value("Authentication required"));
     }
 
     @Test
