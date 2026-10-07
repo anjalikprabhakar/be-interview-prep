@@ -1,9 +1,14 @@
 package org.example.product;
 
 import org.example.common.exception.BadRequestException;
+import org.example.common.exception.NotFoundException;
 import org.example.common.web.PageResponse;
 import org.example.product.dto.ProductFilter;
+import org.example.product.dto.ProductRequest;
 import org.example.product.dto.ProductResponse;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -15,6 +20,7 @@ import java.util.Set;
 @Service
 public class ProductService {
 
+    public static final String CACHE = "products";
     static final Set<String> SORTABLE_FIELDS = Set.of("id", "name", "category", "price", "stock", "rating", "createdAt");
 
     private final ProductRepository repository;
@@ -33,6 +39,38 @@ public class ProductService {
         return PageResponse.from(
                 repository.findAll(ProductSpecifications.matching(filter), withStableSort(pageable)),
                 ProductResponse::from);
+    }
+
+    /**
+     * The first call for an id loads from the DB; later calls are served from Caffeine without running this
+     * method. Caches the immutable DTO, never the entity. A 404 throws, so nothing is cached for unknown ids.
+     */
+    @Cacheable(cacheNames = CACHE, key = "#id")
+    @Transactional(readOnly = true)
+    public ProductResponse get(Long id) {
+        return ProductResponse.from(findProduct(id));
+    }
+
+    /** Writes the returned value into the cache, so the next get sees the update immediately. */
+    @CachePut(cacheNames = CACHE, key = "#id")
+    @Transactional
+    public ProductResponse update(Long id, ProductRequest request) {
+        Product product = findProduct(id);
+        // Managed entity: the change is flushed as an UPDATE on commit, no save() needed.
+        product.replace(request.name(), request.category(), request.price(), request.stock(), request.rating());
+        return ProductResponse.from(product);
+    }
+
+    /** Removes the cached entry, so the next get goes to the DB and returns 404. */
+    @CacheEvict(cacheNames = CACHE, key = "#id")
+    @Transactional
+    public void delete(Long id) {
+        repository.delete(findProduct(id));
+    }
+
+    private Product findProduct(Long id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Product " + id + " not found"));
     }
 
     /**
