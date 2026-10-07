@@ -11,6 +11,10 @@ spring:
       ddl-auto: validate   # schema is owned by Flyway migrations
   flyway:
     locations: classpath:db/migration
+  data:
+    web:
+      pageable:
+        max-page-size: 100   # ?size=500 is clamped to 100 (the response's "size" shows the applied value)
 
 app:
   base-url: http://localhost:8080   # prefix for shortUrl in POST /api/urls responses

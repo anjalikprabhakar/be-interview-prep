@@ -51,6 +51,12 @@ public class GlobalExceptionHandler {
                 List.of(new ApiError.FieldError(ex.getName(), invalidValueMessage(ex.getValue(), ex.getRequiredType()))));
     }
 
+    @ExceptionHandler(BadRequestException.class)
+    ResponseEntity<ApiError> handleBadRequest(BadRequestException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "Validation failed", request,
+                List.of(new ApiError.FieldError(ex.getField(), ex.getMessage())));
+    }
+
     @ExceptionHandler(NotFoundException.class)
     ResponseEntity<ApiError> handleNotFound(NotFoundException ex, HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
