@@ -53,6 +53,7 @@ Each feature has a `Controller`, `Service`, `Repository`, entity, `dto/` (Java `
 - PR into `main` using `.github/pull_request_template.md` (Problem / Approach / Decisions & trade-offs / How to test).
 - Self-review the diff, merge, then `git switch main && git pull` before the next question.
 - Keep the `README.md` table up to date with each PR link.
+- **No AI attribution anywhere.** Don't add `Co-Authored-By: Claude …` trailers to commits, or "Generated with Claude Code" footers to PRs or reviews. Commit only as the user's configured git identity, and never change `user.name`/`user.email`.
 
 ## Skills
 | Skill | Use |
@@ -64,8 +65,38 @@ Each feature has a `Controller`, `Service`, `Repository`, entity, `dto/` (Java `
 | `/write-tests` | Unit, MockMvc, and concurrency tests |
 | `/db-migration` | Flyway migration |
 | `/self-review` | Review the diff before the PR |
+| `/pr-review <PR>` | Check out an open PR, build it, run the reviewer agents, and post one `# Verdict:` review on GitHub |
 | `/raise-pr q1` | Push and open the PR from the template, and update the README link |
 | `/merge-pr` | Merge, pull main, and prepare for the next question |
 | `/address-pr-comments` | Handle review feedback |
 | `/explain-code q1` | Interview drill: request flow, decisions, concurrency, "what if you remove this line" |
 | `/video-script` | 2-minute video script once all five are merged |
+
+## Project-specific
+This is the single registry used by `/pr-review` and `/self-review`. Change values here only.
+
+**Conventions Skills** (load before reviewing or writing code)
+| Skill | Covers | Rule IDs |
+|---|---|---|
+| `java-spring-conventions` | production code under `src/main` | JS-1 … JS-22 |
+| `testing-conventions` | tests under `src/test` | TS-1 … TS-10 |
+
+**Conventions files**
+- `.claude/conventions/review-conventions.md`: what blocks (B1–B10), filtering, review count, posting mode
+- `.claude/conventions/review-template.md`: the exact shape of the review body
+- `.claude/conventions/comment-conventions.md`: rules for every changed comment
+
+**Reviewer Agents**
+| Agent | Focus |
+|---|---|
+| `code-reviewer` | correctness, concurrency, security, API contract, migrations, explainability (B3–B8, B10) |
+| `test-reviewer` | AC → test coverage, tests that can't fail, flakiness (B1, B2, TS-*) |
+
+**Label Routing** (first match on PR labels, then on changed paths)
+| Signal | Agents | Extra focus passed to the agents |
+|---|---|---|
+| label `docs`, or only `*.md` changed | `code-reviewer` | accuracy of the docs against the code, plus B9 |
+| label `security`, or paths under `auth/`, `user/`, `*Security*` | `code-reviewer`, `test-reviewer` | B5 security and JS-17…JS-19, TS-8 |
+| label `database`, or `db/migration/**` changed | `code-reviewer`, `test-reviewer` | B7 data integrity and JS-10, JS-11 |
+| label `concurrency`, or paths under `shortener/`, `order/` | `code-reviewer`, `test-reviewer` | B4 concurrency and JS-14…JS-16, TS-6 |
+| default | `code-reviewer`, `test-reviewer` | all of B1–B10 |

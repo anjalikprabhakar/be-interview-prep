@@ -51,8 +51,9 @@ Ask: "Raise the PR?"
 ## 6. PR + README
 Follow `raise-pr` with `$ARGUMENTS`. It pushes, opens the PR with the 4-section template, and commits the README PR link on the branch.
 
-## 7. Merge ⏸
-Show the PR URL. Ask "Merge now?", then follow `merge-pr`.
+## 7. Review + merge ⏸
+Run the `pr-review` workflow on the PR. It posts a `# Verdict:` review as a comment, which is visible evidence of the "review your own diff before merging" step. If the verdict is FAIL, fix the findings, push, and review again.
+Once the verdict is PASS, show the PR URL and review URL. Ask "Merge now?", then follow `merge-pr`.
 
 ## 8. Wrap-up
 Print three likely interview questions about *this* code with short answers, taken from the spec's "Interview prep" and adjusted to what was actually built. Suggest running `/explain-code $ARGUMENTS` before starting the next question.

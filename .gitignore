@@ -36,3 +36,6 @@ CLAUDE.local.md
 
 # Assignment brief (private; not for the public repo)
 docs/*.pdf
+
+# Local review scratch file written by /pr-review
+review-body.md
