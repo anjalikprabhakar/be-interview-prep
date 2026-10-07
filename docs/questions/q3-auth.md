@@ -67,11 +67,17 @@ Once security is on the classpath, **every endpoint requires a token**, so the Q
 | Password hash | BCrypt | Argon2, PBKDF2 | Spring default, salted, adaptive cost. |
 | 401/403 JSON | `AuthenticationEntryPoint` + `AccessDeniedHandler` | `@RestControllerAdvice` | Security exceptions happen **in the filter chain, before the DispatcherServlet**, so controller advice never sees them. |
 | Login failure message | Generic "Invalid credentials" | "User not found" vs "wrong password" | Prevents user enumeration. |
+| Unknown email at login | Still run a BCrypt compare against a dummy hash | Return early | Otherwise the faster response reveals which emails have accounts. |
+| Test signing key | `src/test/resources/config/application.yml`: `${random.value}${random.value}` (new key per test context) | A fixed test key in a test yml · `@DynamicPropertySource` on every test class | No key is committed, and no annotation is needed per class. It sits under `config/` because a test `application.yml` at the root would hide the main one instead of overriding it. |
+| Duplicate email | Catch the UNIQUE violation outside a transaction → 409 (`register` is not `@Transactional`) | `existsByEmail` check first | The check-then-insert races. The constraint is the guarantee, the same pattern as Q2's code collisions. |
+| Email case | Trimmed and lower-cased before saving and on login | Store as typed | `A@x.com` and `a@x.com` would otherwise be two accounts. |
+| Password length | 8 to 72 characters | No max | BCrypt silently ignores bytes after 72. |
+| Q1/Q2 under security | Redirect `/{code}` stays public; every other `/api/**` needs a token; existing tests use `@WithMockUser` | `.with(jwt())` on each request | One class-level annotation per test class. The real token flow is covered by the auth tests. |
 
 ## Test plan
 | AC | Test | Type |
 |---|---|---|
-| **USER can't access admin** | `AdminUsersTest.listUsers_asUser_returns403Json` | `@SpringBootTest` + MockMvc, real token from login (or `jwt().authorities(ROLE_USER)`) |
+| **USER can't access admin** | `AccessControlTest.listUsers_asUser_returns403Json` | `@SpringBootTest` + MockMvc, real token from login (or `jwt().authorities(ROLE_USER)`) |
 | No token | `listUsers_noToken_returns401Json` | MockMvc |
 | ADMIN ok | `listUsers_asAdmin_returns200` | MockMvc |
 | Me | `me_withToken_returnsOwnProfile` | MockMvc |
