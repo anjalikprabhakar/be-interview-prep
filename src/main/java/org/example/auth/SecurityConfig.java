@@ -31,7 +31,7 @@ public class SecurityConfig {
     private static final int MIN_HS256_KEY_BYTES = 32;
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityErrorHandler errorHandler) throws Exception {
         http
                 // CSRF abuses cookies the browser sends automatically; a bearer header is never sent automatically.
                 .csrf(AbstractHttpConfigurer::disable)
@@ -44,7 +44,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                        // Used when a bearer token is present but invalid or expired.
+                        .authenticationEntryPoint(errorHandler))
+                .exceptionHandling(errors -> errors
+                        // No token at all -> 401; valid token but wrong role -> 403. Both as ApiError JSON.
+                        .authenticationEntryPoint(errorHandler)
+                        .accessDeniedHandler(errorHandler));
         return http.build();
     }
 
