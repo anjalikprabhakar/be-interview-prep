@@ -56,6 +56,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
     }
 
+    @ExceptionHandler(GoneException.class)
+    ResponseEntity<ApiError> handleGone(GoneException ex, HttpServletRequest request) {
+        return build(HttpStatus.GONE, ex.getMessage(), request, List.of());
+    }
+
     /**
      * The row changed or disappeared between our read and our write, e.g. two DELETEs (or a DELETE and a PUT)
      * on the same task at the same time. The losing request gets a retryable 409 instead of a 500.
