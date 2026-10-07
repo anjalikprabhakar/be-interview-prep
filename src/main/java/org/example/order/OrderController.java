@@ -52,6 +52,12 @@ public class OrderController {
         return service.get(id, authentication.getName());
     }
 
+    /** A state change rather than a delete: the order and its history stay, only the stock comes back. */
+    @PostMapping("/{id}/cancel")
+    public OrderResponse cancel(@PathVariable Long id, Authentication authentication) {
+        return service.cancel(id, authentication.getName());
+    }
+
     private static void requireValidKey(String key) {
         if (key.isBlank() || key.length() > MAX_KEY_LENGTH) {
             throw new BadRequestException(IDEMPOTENCY_KEY, "must be 1 to " + MAX_KEY_LENGTH + " characters");

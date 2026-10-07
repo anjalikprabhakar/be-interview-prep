@@ -1,7 +1,9 @@
 package org.example.order;
 
+import org.example.common.exception.ConflictException;
 import org.example.common.exception.NotFoundException;
 import org.example.order.dto.OrderItemRequest;
+import org.example.order.dto.OrderItemResponse;
 import org.example.order.dto.OrderRequest;
 import org.example.order.dto.OrderResponse;
 import org.example.product.Product;
@@ -16,6 +18,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedMap;
@@ -60,6 +63,13 @@ public class OrderService {
         return result;
     }
 
+    /** Same TransactionTemplate reason as place: the cache is evicted after the restored stock is committed. */
+    public OrderResponse cancel(Long id, String customer) {
+        OrderResponse order = transaction.execute(status -> cancelInTransaction(id, customer));
+        evictProducts(order.items().stream().map(OrderItemResponse::productId).toList());
+        return order;
+    }
+
     @Transactional(readOnly = true)
     public OrderResponse get(Long id, String customer) {
         return OrderResponse.from(findOrder(id, customer));
@@ -93,6 +103,20 @@ public class OrderService {
             order.addItem(new OrderItem(productId, quantity, price));
         });
         return new PlaceOrderResult(OrderResponse.from(orders.save(order)), true);
+    }
+
+    private OrderResponse cancelInTransaction(Long id, String customer) {
+        // Stock is restored only by the request whose UPDATE actually flipped PLACED -> CANCELLED.
+        if (orders.cancel(id, customer) == 0) {
+            findOrder(id, customer); // 404 if it doesn't exist or isn't this customer's
+            throw new ConflictException("Order " + id + " is already cancelled");
+        }
+        Order order = findOrder(id, customer);
+        // Same ascending productId lock order as place, so a cancel and a new order can't deadlock.
+        order.getItems().stream()
+                .sorted(Comparator.comparing(OrderItem::getProductId))
+                .forEach(item -> products.release(item.getProductId(), item.getQuantity()));
+        return OrderResponse.from(order);
     }
 
     private Optional<PlaceOrderResult> findRetried(String customer, String idempotencyKey) {
